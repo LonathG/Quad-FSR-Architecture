@@ -432,6 +432,70 @@ public class BroomFlightController : MonoBehaviour
         smoothTurnInput = Mathf.Lerp(smoothTurnInput, rawTurnInput, turnSmoothSpeed * Time.deltaTime);
 
         // 5. Check Grounded State
+        bool isGrounded = false;
+        if (characterController != null && characterController.enabled)
+        {
+            isGrounded = characterController.isGrounded;
+        }
+        else if (useGroundLimit && rigTarget != null && rigTarget.position.y <= minGroundY + 0.05f)
+        {
+            isGrounded = true;
+        }
+
+        // 6. Calculate Forward Flight Speed
+        float maxSpeed = (speedMultiplier <= 2.0f) ? (speedMultiplier * 100f) : speedMultiplier;
+        float targetSpeed = (smoothThrustInput / 100f) * maxSpeed;
+        float lerpFactor = (targetSpeed > currentSpeed) ? accelerationSmooth : decelerationSmooth;
+        currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, lerpFactor);
+
+        // 7. Calculate Vertical Ascent vs Smooth Glide/Descent
+        float targetVertSpeed = 0f;
+        if (smoothAltitudeInput > 2.0f)
+        {
+            // Squeezing FSR 2 (or holding Space) -> Fly UP proportional to squeeze pressure
+            float climbRatio = Mathf.Clamp01(smoothAltitudeInput / 100f);
+            targetVertSpeed = climbRatio * maxClimbSpeed;
+        }
+        else if (isKeyboardDescending)
+        {
+            // Fast descent override (Q / Left Ctrl)
+            targetVertSpeed = -maxDescendSpeed;
+        }
+        else
+        {
+            // No squeeze -> Smooth glide down to ground
+            if (isGrounded)
+            {
+                targetVertSpeed = -0.5f;
+            }
+            else
+            {
+                targetVertSpeed = -gravityFallSpeed;
+            }
+        }
+
+        // Smooth vertical velocity damping
+        currentVerticalSpeed = Mathf.SmoothDamp(currentVerticalSpeed, targetVertSpeed, ref verticalSpeedVelocity, altitudeSmoothTime);
+
+        // Anti-Bounce on touchdown
+        if (isGrounded && currentVerticalSpeed < -0.8f && smoothAltitudeInput <= 2.0f)
+        {
+            currentVerticalSpeed = -0.5f;
+        }
+
+        // Periodic Diagnostic Console Log (Every 1.5s)
+        logTimer += Time.deltaTime;
+        if (logTimer > 1.5f)
+        {
+            if (debugLogs)
+            {
+                string status = (sp != null && sp.IsOpen) ? $"CONNECTED ({measuredPacketsPerSec} PPS)" : "DISCONNECTED";
+                Debug.Log($"[BroomFlight Status] {status} | Thrust: {targetThrust}% | Alt: {targetAltitude}% | Turn: L{targetLeftTurn}%/R{targetRightTurn}% (Net:{smoothTurnInput:F2}) | HSpeed: {currentSpeed:F1}m/s | VSpeed: {currentVerticalSpeed:F1}m/s | Ground: {isGrounded}");
+            }
+            logTimer = 0;
+        }
+
+        if (rigTarget == null || vrCamera == null) return;
 
     }
 
