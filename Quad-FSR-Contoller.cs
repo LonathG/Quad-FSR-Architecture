@@ -361,6 +361,78 @@ public class BroomFlightController : MonoBehaviour
 
     void Update()
     {
+        // 1. Process incoming packet telemetry from background thread
+        ParseSerialData();
+
+        // 2. Measure Packets Per Second (PPS)
+        ppsTimer += Time.deltaTime;
+        if (ppsTimer >= 1.0f)
+        {
+            measuredPacketsPerSec = packetsInLastSecond;
+            packetsInLastSecond = 0;
+            ppsTimer = 0f;
+        }
+
+        // 3. Stale Data Watchdog: If no fresh hardware packet received within 350ms, smoothly zero inputs
+        if (Time.time - lastPacketReceivedTime > 0.35f)
+        {
+            serialThrust = Mathf.RoundToInt(Mathf.MoveTowards(serialThrust, 0, 150f * Time.deltaTime));
+            serialAltitude = Mathf.RoundToInt(Mathf.MoveTowards(serialAltitude, 0, 150f * Time.deltaTime));
+            serialLeftTurn = Mathf.RoundToInt(Mathf.MoveTowards(serialLeftTurn, 0, 150f * Time.deltaTime));
+            serialRightTurn = Mathf.RoundToInt(Mathf.MoveTowards(serialRightTurn, 0, 150f * Time.deltaTime));
+        }
+
+        // 4. Keyboard Fallback Input (Testing without hardware)
+        int keyboardThrust = 0;
+        int keyboardAltitude = 0;
+        int keyboardLeftTurn = 0;
+        int keyboardRightTurn = 0;
+        bool isKeyboardDescending = false;
+
+        if (enableKeyboardFallback)
+        {
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow))
+            {
+                keyboardThrust = 100;
+            }
+
+            if (Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.E))
+            {
+                keyboardAltitude = 100;
+            }
+
+            if (Input.GetKey(KeyCode.Q) || Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C))
+            {
+                isKeyboardDescending = true;
+            }
+
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
+            {
+                keyboardLeftTurn = 100;
+            }
+
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
+            {
+                keyboardRightTurn = 100;
+            }
+        }
+
+        // Combine Serial Hardware and Keyboard Inputs (Max of both)
+        targetThrust = Mathf.Max(serialThrust, keyboardThrust);
+        targetAltitude = Mathf.Max(serialAltitude, keyboardAltitude);
+        targetLeftTurn = Mathf.Max(serialLeftTurn, keyboardLeftTurn);
+        targetRightTurn = Mathf.Max(serialRightTurn, keyboardRightTurn);
+
+        // Smooth inputs to eliminate frame-rate jitter
+        smoothThrustInput = Mathf.Lerp(smoothThrustInput, targetThrust, 15f * Time.deltaTime);
+        smoothAltitudeInput = Mathf.Lerp(smoothAltitudeInput, targetAltitude, 15f * Time.deltaTime);
+
+        // Calculate net steering input (-1.0 for full Left, +1.0 for full Right)
+        float rawTurnInput = ((float)targetRightTurn - (float)targetLeftTurn) / 100f;
+        smoothTurnInput = Mathf.Lerp(smoothTurnInput, rawTurnInput, turnSmoothSpeed * Time.deltaTime);
+
+        // 5. Check Grounded State
+
     }
 
     void ParseSerialData()
