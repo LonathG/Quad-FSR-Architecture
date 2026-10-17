@@ -175,11 +175,29 @@ public class BroomFlightController : MonoBehaviour
             }
         }
 
+        // 4. Connect Serial Hardware with Auto-Reconnect Coroutine
+        if (enableSerial)
+        {
+            StartCoroutine(AutoConnectLoop());
+        }
     }
 
-    void Update()
+
+    private IEnumerator AutoConnectLoop()
     {
+        while (enableSerial)
+        {
+            if (sp == null || !sp.IsOpen || !isThreadActive)
+            {
+                InitSerial();
+            }
+
+            // Non-aggressive 4-second check to avoid driver lockups
+            yield return new WaitForSeconds(4.0f);
+        }
     }
+
+
     void InitSerial()
     {
         try
@@ -340,6 +358,10 @@ public class BroomFlightController : MonoBehaviour
         isThreadActive = false;
     }
 
+
+    void Update()
+    {
+    }
 
     private void CloseSerialConnection() { }
 }
