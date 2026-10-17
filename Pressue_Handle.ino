@@ -50,6 +50,27 @@ void loop() {
   smoothLeftTurn  = (smoothLeftTurn * 0.75f) + (rawLeftTurn * 0.25f);
   smoothRightTurn = (smoothRightTurn * 0.75f) + (rawRightTurn * 0.25f);
 
+  // 3. Map smoothed readings to 0-100% with deadzone and constrain
+  int speedPercent = 0;
+  if (smoothThrust > thrustDeadzone) {
+    speedPercent = constrain(map((int)smoothThrust, thrustDeadzone, thrustMax, 0, 100), 0, 100);
+  }
+
+  int altPercent = 0;
+  if (smoothAltitude > altitudeDeadzone) {
+    altPercent = constrain(map((int)smoothAltitude, altitudeDeadzone, altitudeMax, 0, 100), 0, 100);
+  }
+
+  int leftTurnPercent = 0;
+  if (smoothLeftTurn > leftTurnDeadzone) {
+    leftTurnPercent = constrain(map((int)smoothLeftTurn, leftTurnDeadzone, leftTurnMax, 0, 100), 0, 100);
+  }
+
+  int rightTurnPercent = 0;
+  if (smoothRightTurn > rightTurnDeadzone) {
+    rightTurnPercent = constrain(map((int)smoothRightTurn, rightTurnDeadzone, rightTurnMax, 0, 100), 0, 100);
+  }
+
   Serial.print(F("Raw_Thrust:"));
   Serial.print(rawThrust);
   Serial.print(F(",Raw_Altitude:"));
