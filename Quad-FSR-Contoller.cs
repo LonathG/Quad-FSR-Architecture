@@ -180,4 +180,63 @@ public class BroomFlightController : MonoBehaviour
     void Update()
     {
     }
+    void InitSerial()
+    {
+        try
+        {
+            CloseSerialConnection();
+
+            if (!portNamesLogged && debugLogs)
+            {
+                portNamesLogged = true;
+                try
+                {
+                    string[] availablePorts = SerialPort.GetPortNames();
+                    Debug.Log($"[BroomFlight] Available Serial Ports on PC: [{string.Join(", ", availablePorts)}]");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[BroomFlight] Could not query COM ports: {ex.Message}");
+                }
+            }
+
+            Debug.Log($"[BroomFlight] Attempting connection on {portName} @ {baudRate} baud...");
+
+            sp = new SerialPort(portName, baudRate)
+            {
+                ReadTimeout = 50,    // Short timeout so thread loop responds to shutdown quickly
+                WriteTimeout = 50,
+                DtrEnable = true,
+                RtsEnable = true
+            };
+
+            sp.Open();
+
+            isRunning = true;
+            lastConnectionError = "";
+            consecutiveErrors = 0;
+
+            serialThread = new Thread(ReadSerialData)
+            {
+                IsBackground = true,
+                Name = "BroomFlight_SerialReader"
+            };
+            serialThread.Start();
+
+            Debug.Log($"<color=#00FF66><b>[BroomFlight] Successfully Connected to Hardware on {portName} ({baudRate} baud)!</b></color>");
+        }
+        catch (System.Exception e)
+        {
+            lastConnectionError = e.Message;
+            if (debugLogs)
+            {
+                Debug.LogWarning($"[BroomFlight] Serial Connection Pending on {portName}: {e.Message}");
+            }
+            CloseSerialConnection();
+        }
+    }
+
+
+    void ReadSerialData() { }
+    private void CloseSerialConnection() { }
 }
