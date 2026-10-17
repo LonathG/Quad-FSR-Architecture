@@ -6,6 +6,13 @@ const int altitudeFsrPin  = A1; // FSR 2: Altitude / Lift (Pin A1)
 const int leftTurnFsrPin  = A2; // FSR 3: Left Turn (Pin A2)
 const int rightTurnFsrPin = A3; // FSR 4: Right Turn (Pin A3)
 
+// Calibration thresholds (Adjust based on your squeeze intensity)
+const int thrustDeadzone = 15;    // Below this value is considered resting/zero
+const int thrustMax = 350;        // Max expected reading for FSR 1 (e.g. 100-500)
+
+const int altitudeDeadzone = 25;  // Below this value is considered resting/zero
+const int altitudeMax = 700;      // Max expected reading for FSR 2 (e.g. 700)
+
 void setup() {
   Serial.begin(115200); // 115200 baud (matching BroomFlightController default)
   Serial.println(F("--- QUAD FSR MODE: THRUST (A0), ALTITUDE (A1), LEFT TURN (A2), RIGHT TURN (A3) ---"));
