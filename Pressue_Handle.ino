@@ -1,4 +1,5 @@
 // Component 01: Motion Rendering - Quad Pressure Sensor Handle (Thrust, Altitude, Left Turn, Right Turn)
+// Pure FSR sensor controller (No haptic motor load on USB 5V rail)
 
 const int thrustFsrPin    = A0; // FSR 1: Forward Thrust (Pin A0)
 const int altitudeFsrPin  = A1; // FSR 2: Altitude / Lift (Pin A1)
@@ -11,9 +12,17 @@ void setup() {
 }
 
 void loop() {
+  // 1. Read FSRs with ADC settling dummy reads to prevent channel crosstalk
+  analogRead(thrustFsrPin); // dummy read to settle ADC multiplexer
   int rawThrust = analogRead(thrustFsrPin);
+
+  analogRead(altitudeFsrPin); // dummy read to settle ADC multiplexer
   int rawAltitude = analogRead(altitudeFsrPin);
+
+  analogRead(leftTurnFsrPin); // dummy read to settle ADC multiplexer
   int rawLeftTurn = analogRead(leftTurnFsrPin);
+
+  analogRead(rightTurnFsrPin); // dummy read to settle ADC multiplexer
   int rawRightTurn = analogRead(rightTurnFsrPin);
 
   Serial.print(F("Raw_Thrust:"));
@@ -25,5 +34,5 @@ void loop() {
   Serial.print(F(",Raw_RightTurn:"));
   Serial.println(rawRightTurn);
 
-  delay(30);
+  delay(25);
 }
