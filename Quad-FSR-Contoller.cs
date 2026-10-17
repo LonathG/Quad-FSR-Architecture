@@ -182,7 +182,6 @@ public class BroomFlightController : MonoBehaviour
         }
     }
 
-
     private IEnumerator AutoConnectLoop()
     {
         while (enableSerial)
@@ -196,7 +195,6 @@ public class BroomFlightController : MonoBehaviour
             yield return new WaitForSeconds(4.0f);
         }
     }
-
 
     void InitSerial()
     {
@@ -253,7 +251,6 @@ public class BroomFlightController : MonoBehaviour
             CloseSerialConnection();
         }
     }
-
 
     /// <summary>
     /// Thread-safe, non-blocking serial packet collector.
@@ -357,7 +354,6 @@ public class BroomFlightController : MonoBehaviour
 
         isThreadActive = false;
     }
-
 
     void Update()
     {
@@ -577,6 +573,45 @@ public class BroomFlightController : MonoBehaviour
         }
     }
 
+    void OnGUI()
+    {
+        if (!showOnScreenDebug) return;
+
+        // Lazy initialize cached GUIStyles to prevent native IMGUI memory leaks
+        if (cachedBoxStyle == null)
+        {
+            cachedBoxStyle = new GUIStyle(GUI.skin.box)
+            {
+                alignment = TextAnchor.UpperLeft,
+                fontSize = 12
+            };
+            cachedBoxStyle.normal.textColor = Color.white;
+        }
+
+        GUILayout.BeginArea(new Rect(15, 15, 430, 305), cachedBoxStyle);
+        GUILayout.Label("<b><size=14>== PROJECT NIMBUS: BROOM FLIGHT ==</size></b>");
+
+        if (sp != null && sp.IsOpen)
+        {
+            GUILayout.Label($"Serial: <color=#00FF66><b>CONNECTED ({portName} @ {baudRate})</b></color> [{measuredPacketsPerSec} PPS | Total: {totalPacketsReceived}]");
+        }
+        else
+        {
+            string err = string.IsNullOrEmpty(lastConnectionError) ? "Searching hardware..." : lastConnectionError;
+            if (err.Length > 32) err = err.Substring(0, 29) + "...";
+            GUILayout.Label($"Serial: <color=#FFAA00><b>DISCONNECTED ({portName})</b></color> <size=10><i>[{err}]</i></size>");
+        }
+
+        GUILayout.Label($"Raw String: <size=11><color=#FFFF88>{latestTelemetryRaw}</color></size>");
+        GUILayout.Label($"Thrust (FSR 1): <b>{targetThrust}%</b> (Serial: {serialThrust}%) | Speed: <b>{currentSpeed:F1} m/s</b>");
+        GUILayout.Label($"Altitude (FSR 2): <b>{targetAltitude}%</b> (Serial: {serialAltitude}%) | VertSpeed: <b>{currentVerticalSpeed:F1} m/s</b>");
+        GUILayout.Label($"Steering (FSR 3/4): L <b>{targetLeftTurn}%</b> | R <b>{targetRightTurn}%</b> | Net: <b>{smoothTurnInput:F2}</b>");
+        GUILayout.Label($"Rig Position Y: <b>{(rigTarget != null ? rigTarget.position.y.ToString("F2") : "NULL")} m</b>");
+        GUILayout.Label($"Grounded: <b>{(lastGroundedState ? "<color=#00FF66>TRUE (Grounded)</color>" : "<color=#00FFFF>AIRBORNE (Flying)</color>")}</b>");
+        GUILayout.Label($"Movement Target: <b>{(rigTarget != null ? rigTarget.name : "NULL")}</b> | Collider: {(characterController != null ? $"CharacterController ({lastCollisionFlags})" : (rb != null ? "Rigidbody" : "Transform"))}");
+        GUILayout.Label($"FPS: <b>{(1f / Time.unscaledDeltaTime):F0}</b> | Thread Active: <b>{isThreadActive}</b>");
+        GUILayout.EndArea();
+    }
 
     void ParseSerialData()
     {
@@ -735,7 +770,6 @@ public class BroomFlightController : MonoBehaviour
         }
     }
 
-
     private bool HasDigits(string input)
     {
         foreach (char c in input)
@@ -745,6 +779,71 @@ public class BroomFlightController : MonoBehaviour
         return false;
     }
 
+    void OnDisable()
+    {
+        CloseSerialConnection();
+    }
 
-    private void CloseSerialConnection() { }
+    void OnDestroy()
+    {
+        CloseSerialConnection();
+    }
+
+    void OnApplicationQuit()
+    {
+        CloseSerialConnection();
+    }
+
+    /// <summary>
+    /// Safely terminates the background thread BEFORE closing the underlying serial port handle.
+    /// This prevents native Win32 kernel crashes and mono thread abort exceptions.
+    /// </summary>
+    private void CloseSerialConnection()
+    {
+        isRunning = false;
+
+        // 1. Give the reader thread up to 500ms to exit cooperatively
+        if (serialThread != null && serialThread.IsAlive)
+        {
+            try
+            {
+                serialThread.Join(500);
+            }
+            catch (System.Exception ex)
+            {
+                if (debugLogs) Debug.LogWarning($"[BroomFlight] Thread Join Warning: {ex.Message}");
+            }
+            finally
+            {
+                serialThread = null;
+            }
+        }
+
+        // 2. Safely close and dispose the SerialPort stream
+        if (sp != null)
+        {
+            try
+            {
+                if (sp.IsOpen)
+                {
+                    sp.DiscardInBuffer();
+                    sp.DiscardOutBuffer();
+                    sp.Close();
+                }
+            }
+            catch (System.Exception) { }
+
+            try
+            {
+                sp.Dispose();
+            }
+            catch (System.Exception) { }
+            finally
+            {
+                sp = null;
+            }
+        }
+
+        isThreadActive = false;
+    }
 }
