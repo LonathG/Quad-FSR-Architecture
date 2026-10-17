@@ -71,14 +71,23 @@ void loop() {
     rightTurnPercent = constrain(map((int)smoothRightTurn, rightTurnDeadzone, rightTurnMax, 0, 100), 0, 100);
   }
 
+  // 4. Print raw and mapped key-value pairs for Serial Plotter and Unity
   Serial.print(F("Raw_Thrust:"));
   Serial.print(rawThrust);
+  Serial.print(F(",Broom_Speed:"));
+  Serial.print(speedPercent);
   Serial.print(F(",Raw_Altitude:"));
   Serial.print(rawAltitude);
+  Serial.print(F(",Broom_Altitude:"));
+  Serial.print(altPercent);
   Serial.print(F(",Raw_LeftTurn:"));
   Serial.print(rawLeftTurn);
+  Serial.print(F(",Broom_LeftTurn:"));
+  Serial.print(leftTurnPercent);
   Serial.print(F(",Raw_RightTurn:"));
-  Serial.println(rawRightTurn);
+  Serial.print(rawRightTurn);
+  Serial.print(F(",Broom_RightTurn:"));
+  Serial.println(rightTurnPercent);
 
-  delay(25);
+  delay(25); // ~40Hz Refresh rate
 }
