@@ -13,6 +13,12 @@ const int thrustMax = 350;        // Max expected reading for FSR 1 (e.g. 100-50
 const int altitudeDeadzone = 25;  // Below this value is considered resting/zero
 const int altitudeMax = 700;      // Max expected reading for FSR 2 (e.g. 700)
 
+const int leftTurnDeadzone = 15;  // Below this value is considered resting/zero
+const int leftTurnMax = 350;      // Max expected reading for FSR 3
+
+const int rightTurnDeadzone = 15; // Below this value is considered resting/zero
+const int rightTurnMax = 350;     // Max expected reading for FSR 4
+
 void setup() {
   Serial.begin(115200); // 115200 baud (matching BroomFlightController default)
   Serial.println(F("--- QUAD FSR MODE: THRUST (A0), ALTITUDE (A1), LEFT TURN (A2), RIGHT TURN (A3) ---"));
