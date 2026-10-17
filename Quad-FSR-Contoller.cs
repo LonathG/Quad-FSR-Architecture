@@ -49,6 +49,84 @@ public class BroomFlightController : MonoBehaviour
     [Tooltip("Minimum head tilt roll angle before tilt steering kicks in.")]
     public float tiltThreshold = 8f;
 
+    [Header("Sensor Mapping Settings")]
+    [Tooltip("Minimum expected raw sensor value from hardware (deadzone).")]
+    public float rawInputMin = 15f;
+    [Tooltip("Maximum expected raw sensor value for Thrust FSR 1 (e.g. 350).")]
+    public float rawThrustMax = 350f;
+    [Tooltip("Maximum expected raw sensor value for Altitude FSR 2 (e.g. 700).")]
+    public float rawAltitudeMax = 700f;
+    [Tooltip("Maximum expected raw sensor value for Left Turn FSR 3 (e.g. 350).")]
+    public float rawLeftTurnMax = 350f;
+    [Tooltip("Maximum expected raw sensor value for Right Turn FSR 4 (e.g. 350).")]
+    public float rawRightTurnMax = 350f;
+    [Tooltip("Automatically scale hardware values to 0-100% flight thrust, altitude & steering.")]
+    public bool autoScaleSensorInput = true;
+
+    [Header("Testing & Debug Fallback")]
+    [Tooltip("Allow pressing W/Up (thrust), Space/E (climb), Q/Ctrl (descend), A/Left (turn left), D/Right (turn right) without hardware.")]
+    public bool enableKeyboardFallback = true;
+    public bool debugLogs = true;
+    [Tooltip("Display an on-screen real-time telemetry HUD in the Game view / VR.")]
+    public bool showOnScreenDebug = true;
+
+    // Serial & Threading State (Crash-proof architecture)
+    private SerialPort sp;
+    private Thread serialThread;
+    private readonly object dataLock = new object();
+    private string lastData = "";
+    private volatile bool isRunning = false;
+    private volatile bool isThreadActive = false;
+
+    // Diagnostics & Metrics
+    private int totalPacketsReceived = 0;
+    private int packetsInLastSecond = 0;
+    private int measuredPacketsPerSec = 0;
+    private float ppsTimer = 0f;
+    private float lastPacketReceivedTime = 0f;
+    private string latestTelemetryRaw = "Waiting for hardware...";
+    private string lastConnectionError = "";
+    private bool portNamesLogged = false;
+    private int consecutiveErrors = 0;
+
+    // Flight Dynamics State
+    private float currentSpeed = 0f;
+    private float currentVerticalSpeed = 0f;
+    private float verticalSpeedVelocity = 0f;
+    private float smoothThrustInput = 0f;
+    private float smoothAltitudeInput = 0f;
+    private float smoothTurnInput = 0f;
+    private int serialThrust = 0;
+    private int serialAltitude = 0;
+    private int serialLeftTurn = 0;
+    private int serialRightTurn = 0;
+    private int targetThrust = 0;
+    private int targetAltitude = 0;
+    private int targetLeftTurn = 0;
+    private int targetRightTurn = 0;
+    private float logTimer = 0f;
+    private bool lastGroundedState = false;
+    private CollisionFlags lastCollisionFlags = CollisionFlags.None;
+
+    // Cached GUI Styles to prevent native IMGUI memory leaks
+    private GUIStyle cachedBoxStyle;
+    private GUIStyle cachedHeaderStyle;
+    private GUIStyle cachedDataStyle;
+
+    // Public Telemetry Accessors for external controllers (Fans, Lighting, Audio)
+    public float CurrentSpeed => currentSpeed;
+    public float CurrentVerticalSpeed => currentVerticalSpeed;
+    public int TargetThrust => targetThrust;
+    public int TargetAltitude => targetAltitude;
+    public int TargetLeftTurn => targetLeftTurn;
+    public int TargetRightTurn => targetRightTurn;
+    public float SmoothTurnInput => smoothTurnInput;
+    public int PacketsPerSecond => measuredPacketsPerSec;
+    public bool IsSerialConnected => sp != null && sp.IsOpen && isRunning;
+
+    private CharacterController characterController;
+    private Rigidbody rb;
+
 
     void Start()
     {
