@@ -6,7 +6,8 @@ const int leftTurnFsrPin  = A2; // FSR 3: Left Turn (Pin A2)
 const int rightTurnFsrPin = A3; // FSR 4: Right Turn (Pin A3)
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200); // 115200 baud (matching BroomFlightController default)
+  Serial.println(F("--- QUAD FSR MODE: THRUST (A0), ALTITUDE (A1), LEFT TURN (A2), RIGHT TURN (A3) ---"));
 }
 
 void loop() {
@@ -15,14 +16,14 @@ void loop() {
   int rawLeftTurn = analogRead(leftTurnFsrPin);
   int rawRightTurn = analogRead(rightTurnFsrPin);
 
-  Serial.print("Raw_Thrust:");
+  Serial.print(F("Raw_Thrust:"));
   Serial.print(rawThrust);
-  Serial.print(",Raw_Altitude:");
+  Serial.print(F(",Raw_Altitude:"));
   Serial.print(rawAltitude);
-  Serial.print(",Raw_LeftTurn:");
+  Serial.print(F(",Raw_LeftTurn:"));
   Serial.print(rawLeftTurn);
-  Serial.print(",Raw_RightTurn:");
+  Serial.print(F(",Raw_RightTurn:"));
   Serial.println(rawRightTurn);
 
-  delay(50);
+  delay(30);
 }
