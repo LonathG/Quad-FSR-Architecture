@@ -1,5 +1,5 @@
 // Component 01: Motion Rendering - Pressure Sensor Handle
-// Initial prototype for forward thrust input
+// Single FSR sensor controller
 
 const int thrustFsrPin = A0; // FSR 1: Forward Thrust (Pin A0)
 
@@ -8,6 +8,10 @@ void setup() {
 }
 
 void loop() {
-  // Empty loop placeholder
+  int rawThrust = analogRead(thrustFsrPin);
+
+  Serial.print("Raw_Thrust:");
+  Serial.println(rawThrust);
+
   delay(50);
 }
