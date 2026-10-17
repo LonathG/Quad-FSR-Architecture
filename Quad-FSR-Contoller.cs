@@ -363,5 +363,99 @@ public class BroomFlightController : MonoBehaviour
     {
     }
 
+    void ParseSerialData()
+    {
+        string rawLine = null;
+        lock (dataLock)
+        {
+            if (!string.IsNullOrEmpty(lastData))
+            {
+                rawLine = lastData;
+                lastData = null;
+            }
+        }
+
+        if (string.IsNullOrEmpty(rawLine)) return;
+
+        string cleanData = rawLine.Trim();
+        if (string.IsNullOrEmpty(cleanData)) return;
+
+        latestTelemetryRaw = cleanData;
+        totalPacketsReceived++;
+        packetsInLastSecond++;
+
+        // Ignore Arduino banner / header comments
+        if (cleanData.StartsWith("-") || cleanData.StartsWith("=") || cleanData.StartsWith("*") || cleanData.StartsWith("#") || !HasDigits(cleanData))
+        {
+            if (debugLogs) Debug.Log("[BroomFlight Arduino Banner] " + cleanData);
+            return;
+        }
+
+        try
+        {
+            string[] items = cleanData.Split(',');
+            bool parsedThrust = false;
+            bool parsedAltitude = false;
+            bool parsedLeftTurn = false;
+            bool parsedRightTurn = false;
+
+            // 1. Processed percentage keys ("Broom_Speed", "Broom_Altitude", "Broom_LeftTurn", "Broom_RightTurn")
+            foreach (string item in items)
+            {
+                string[] parts = item.Split(':');
+                if (parts.Length == 2)
+                {
+                    string key = parts[0].Trim().ToLower();
+                    if (float.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float val))
+                    {
+                        if (key == "broom_speed" || key == "speed" || key == "thrust")
+                        {
+                            serialThrust = Mathf.RoundToInt(Mathf.Clamp(val, 0f, 100f));
+                            parsedThrust = true;
+                        }
+                        else if (key == "broom_altitude" || key == "altitude" || key == "climb" || key == "lift")
+                        {
+                            serialAltitude = Mathf.RoundToInt(Mathf.Clamp(val, 0f, 100f));
+                            parsedAltitude = true;
+                        }
+                        else if (key == "broom_leftturn" || key == "broom_left" || key == "leftturn" || key == "left")
+                        {
+                            serialLeftTurn = Mathf.RoundToInt(Mathf.Clamp(val, 0f, 100f));
+                            parsedLeftTurn = true;
+                        }
+                        else if (key == "broom_rightturn" || key == "broom_right" || key == "rightturn" || key == "right")
+                        {
+                            serialRightTurn = Mathf.RoundToInt(Mathf.Clamp(val, 0f, 100f));
+                            parsedRightTurn = true;
+                        }
+                    }
+                }
+            }
+
+
+            if (parsedThrust || parsedAltitude || parsedLeftTurn || parsedRightTurn)
+            {
+                lastPacketReceivedTime = Time.time;
+            }
+        }
+        catch (System.Exception e)
+        {
+            if (debugLogs)
+            {
+                Debug.LogError($"[BroomFlight] Parse Error: '{cleanData}' | {e.Message}");
+            }
+        }
+    }
+
+    private bool HasDigits(string input)
+    {
+        foreach (char c in input)
+        {
+            if (char.IsDigit(c)) return true;
+        }
+        return false;
+    }
+
+
     private void CloseSerialConnection() { }
 }
