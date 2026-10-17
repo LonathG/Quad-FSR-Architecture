@@ -19,6 +19,12 @@ const int leftTurnMax = 350;      // Max expected reading for FSR 3
 const int rightTurnDeadzone = 15; // Below this value is considered resting/zero
 const int rightTurnMax = 350;     // Max expected reading for FSR 4
 
+// Exponential Moving Average filter values for hardware noise suppression
+float smoothThrust = 0;
+float smoothAltitude = 0;
+float smoothLeftTurn = 0;
+float smoothRightTurn = 0;
+
 void setup() {
   Serial.begin(115200); // 115200 baud (matching BroomFlightController default)
   Serial.println(F("--- QUAD FSR MODE: THRUST (A0), ALTITUDE (A1), LEFT TURN (A2), RIGHT TURN (A3) ---"));
@@ -37,6 +43,12 @@ void loop() {
 
   analogRead(rightTurnFsrPin); // dummy read to settle ADC multiplexer
   int rawRightTurn = analogRead(rightTurnFsrPin);
+
+  // 2. Low-Pass Exponential Filter (Smooths out jitter/jumping effect)
+  smoothThrust    = (smoothThrust * 0.75f) + (rawThrust * 0.25f);
+  smoothAltitude  = (smoothAltitude * 0.75f) + (rawAltitude * 0.25f);
+  smoothLeftTurn  = (smoothLeftTurn * 0.75f) + (rawLeftTurn * 0.25f);
+  smoothRightTurn = (smoothRightTurn * 0.75f) + (rawRightTurn * 0.25f);
 
   Serial.print(F("Raw_Thrust:"));
   Serial.print(rawThrust);
