@@ -432,6 +432,66 @@ public class BroomFlightController : MonoBehaviour
                 }
             }
 
+            // 2. Secondary fallback for raw ADC sensor keys ("Raw_Thrust", "Raw_Altitude", "Raw_LeftTurn", "Raw_RightTurn")
+            if (!parsedThrust || !parsedAltitude || !parsedLeftTurn || !parsedRightTurn)
+            {
+                foreach (string item in items)
+                {
+                    string[] parts = item.Split(':');
+                    if (parts.Length == 2)
+                    {
+                        string key = parts[0].Trim().ToLower();
+                        if (float.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float val))
+                        {
+                            if (!parsedThrust && (key == "raw_thrust" || key.Contains("thrust")))
+                            {
+                                serialThrust = ScaleSensorValue(val, rawThrustMax);
+                                parsedThrust = true;
+                            }
+                            else if (!parsedAltitude && (key == "raw_altitude" || key.Contains("alt")))
+                            {
+                                serialAltitude = ScaleSensorValue(val, rawAltitudeMax);
+                                parsedAltitude = true;
+                            }
+                            else if (!parsedLeftTurn && (key == "raw_leftturn" || key.Contains("left")))
+                            {
+                                serialLeftTurn = ScaleSensorValue(val, rawLeftTurnMax);
+                                parsedLeftTurn = true;
+                            }
+                            else if (!parsedRightTurn && (key == "raw_rightturn" || key.Contains("right")))
+                            {
+                                serialRightTurn = ScaleSensorValue(val, rawRightTurnMax);
+                                parsedRightTurn = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Fallback for unlabeled comma-separated numbers (e.g. "300, 700, 150, 0")
+            if (!parsedThrust && !parsedAltitude && !parsedLeftTurn && !parsedRightTurn && items.Length >= 1)
+            {
+                if (float.TryParse(items[0].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float val1))
+                {
+                    serialThrust = ScaleSensorValue(val1, rawThrustMax);
+                    parsedThrust = true;
+                }
+                if (items.Length >= 2 && float.TryParse(items[1].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float val2))
+                {
+                    serialAltitude = ScaleSensorValue(val2, rawAltitudeMax);
+                    parsedAltitude = true;
+                }
+                if (items.Length >= 3 && float.TryParse(items[2].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float val3))
+                {
+                    serialLeftTurn = ScaleSensorValue(val3, rawLeftTurnMax);
+                    parsedLeftTurn = true;
+                }
+                if (items.Length >= 4 && float.TryParse(items[3].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float val4))
+                {
+                    serialRightTurn = ScaleSensorValue(val4, rawRightTurnMax);
+                    parsedRightTurn = true;
+                }
+            }
 
             if (parsedThrust || parsedAltitude || parsedLeftTurn || parsedRightTurn)
             {
@@ -446,6 +506,20 @@ public class BroomFlightController : MonoBehaviour
             }
         }
     }
+
+    private int ScaleSensorValue(float val, float maxVal)
+    {
+        if (autoScaleSensorInput && maxVal > rawInputMin)
+        {
+            float pct = Mathf.InverseLerp(rawInputMin, maxVal, val) * 100f;
+            return Mathf.RoundToInt(Mathf.Clamp(pct, 0f, 100f));
+        }
+        else
+        {
+            return Mathf.RoundToInt(Mathf.Clamp(val, 0f, 100f));
+        }
+    }
+
 
     private bool HasDigits(string input)
     {
