@@ -127,9 +127,54 @@ public class BroomFlightController : MonoBehaviour
     private CharacterController characterController;
     private Rigidbody rb;
 
-
     void Start()
     {
+        // 1. Resolve VR Camera
+        if (vrCamera == null)
+        {
+            if (Camera.main != null) vrCamera = Camera.main.transform;
+            else vrCamera = transform;
+        }
+
+        // 2. Resolve Rig Target (Do not move Camera directly because XR tracking overrides it)
+        if (rigTarget == null)
+        {
+            if (transform == vrCamera && transform.parent != null)
+            {
+                rigTarget = transform.parent;
+                Debug.Log($"[BroomFlight] Script attached to Camera. Movement target set to parent: {rigTarget.name}");
+            }
+            else
+            {
+                rigTarget = transform;
+            }
+        }
+
+        // 3. Check for Physics Components on Rig Target
+        if (rigTarget != null)
+        {
+            characterController = rigTarget.GetComponent<CharacterController>();
+            rb = rigTarget.GetComponent<Rigidbody>();
+
+            Debug.Log($"[BroomFlight Setup] Rig Target: '{rigTarget.name}' | Position: {rigTarget.position}");
+            Debug.Log($"[BroomFlight Setup] CharacterController found: {(characterController != null ? $"YES (Enabled: {characterController.enabled}, Height: {characterController.height}, Center: {characterController.center})" : "NO")}");
+            Debug.Log($"[BroomFlight Setup] Rigidbody found: {(rb != null ? $"YES (isKinematic: {rb.isKinematic}, useGravity: {rb.useGravity})" : "NO")}");
+
+            // Scan and report any other locomotion/movement scripts
+            MonoBehaviour[] allScripts = rigTarget.GetComponents<MonoBehaviour>();
+            foreach (var s in allScripts)
+            {
+                if (s != null && s != this)
+                {
+                    string scriptName = s.GetType().Name;
+                    if (scriptName.Contains("Move") || scriptName.Contains("Locomotion") || scriptName.Contains("Gravity") || scriptName.Contains("Driver"))
+                    {
+                        Debug.LogWarning($"[BroomFlight Conflict Warning] Detected locomotion script '{scriptName}' on RigTarget. Ensure gravity/movement scripts do not fight BroomFlight.");
+                    }
+                }
+            }
+        }
+
     }
 
     void Update()
