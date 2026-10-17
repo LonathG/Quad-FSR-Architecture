@@ -237,6 +237,109 @@ public class BroomFlightController : MonoBehaviour
     }
 
 
-    void ReadSerialData() { }
+    /// <summary>
+    /// Thread-safe, non-blocking serial packet collector.
+    /// Accumulates raw incoming bytes without blocking ReadLine hangs or mid-line buffer clearing.
+    /// </summary>
+    void ReadSerialData()
+    {
+        isThreadActive = true;
+        StringBuilder lineBuilder = new StringBuilder(128);
+
+        while (isRunning)
+        {
+            try
+            {
+                if (sp != null && sp.IsOpen)
+                {
+                    // Check available bytes to prevent synchronous kernel hang
+                    int bytesAvailable = sp.BytesToRead;
+                    if (bytesAvailable > 0)
+                    {
+                        // Prevent extreme buffer pileup if computer hitched
+                        if (bytesAvailable > 512)
+                        {
+                            sp.DiscardInBuffer();
+                            lineBuilder.Clear();
+                            continue;
+                        }
+
+                        for (int i = 0; i < bytesAvailable; i++)
+                        {
+                            int byteRead = sp.ReadByte();
+                            if (byteRead == -1) break;
+
+                            char c = (char)byteRead;
+                            if (c == '\n')
+                            {
+                                string completeLine = lineBuilder.ToString();
+                                lineBuilder.Clear();
+
+                                if (!string.IsNullOrEmpty(completeLine))
+                                {
+                                    lock (dataLock)
+                                    {
+                                        lastData = completeLine;
+                                    }
+                                }
+                            }
+                            else if (c != '\r')
+                            {
+                                if (lineBuilder.Length < 256)
+                                {
+                                    lineBuilder.Append(c);
+                                }
+                                else
+                                {
+                                    lineBuilder.Clear(); // Discard oversized garbage
+                                }
+                            }
+                        }
+
+                        consecutiveErrors = 0;
+                    }
+                    else
+                    {
+                        // No bytes currently in buffer; sleep briefly to yield CPU
+                        Thread.Sleep(5);
+                    }
+                }
+                else
+                {
+                    Thread.Sleep(50);
+                }
+            }
+            catch (System.TimeoutException)
+            {
+                // Expected when waiting for next sensor burst
+            }
+            catch (System.IO.IOException ioEx)
+            {
+                consecutiveErrors++;
+                if (consecutiveErrors < 3 && debugLogs)
+                {
+                    Debug.LogWarning($"[BroomFlight Serial IO] {ioEx.Message}");
+                }
+                Thread.Sleep(20);
+            }
+            catch (System.InvalidOperationException)
+            {
+                Thread.Sleep(50);
+            }
+            catch (System.Exception ex)
+            {
+                consecutiveErrors++;
+                if (consecutiveErrors < 3 && debugLogs)
+                {
+                    Debug.LogWarning($"[BroomFlight Serial Error] {ex.Message}");
+                }
+                Thread.Sleep(20);
+            }
+        }
+
+        isThreadActive = false;
+    }
+
+
     private void CloseSerialConnection() { }
 }
