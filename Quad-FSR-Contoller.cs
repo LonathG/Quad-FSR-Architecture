@@ -497,7 +497,86 @@ public class BroomFlightController : MonoBehaviour
 
         if (rigTarget == null || vrCamera == null) return;
 
+        // 8. STEERING (FSR Handle Sensors + Head Tilt Roll)
+        float totalTurnDelta = 0f;
+
+        // FSR Steering (Left / Right Pressure Sensors)
+        if (enableFsrSteering && Mathf.Abs(smoothTurnInput) > 0.005f)
+        {
+            totalTurnDelta += smoothTurnInput * turnSpeed * Time.deltaTime;
+        }
+
+        // Head Tilt Roll Steering (VR Immersion)
+        if (enableHeadTiltSteering && vrCamera != null)
+        {
+            float tiltZ = vrCamera.localEulerAngles.z;
+            if (tiltZ > 180f) tiltZ -= 360f;
+
+            if (Mathf.Abs(tiltZ) > tiltThreshold)
+            {
+                totalTurnDelta += -tiltZ * turnSensitivity * Time.deltaTime;
+            }
+        }
+
+        if (Mathf.Abs(totalTurnDelta) > 0.0001f)
+        {
+            rigTarget.Rotate(0f, totalTurnDelta, 0f);
+        }
+
+        // 9. MOVEMENT (Horizontal Velocity + Vertical Ascent)
+        Vector3 moveDelta = Vector3.zero;
+
+        if (currentSpeed > 0.001f)
+        {
+            Vector3 forwardDir = Vector3.ProjectOnPlane(vrCamera.forward, Vector3.up).normalized;
+            if (forwardDir.sqrMagnitude > 0.001f)
+            {
+                moveDelta += forwardDir * currentSpeed * Time.deltaTime;
+            }
+        }
+
+        moveDelta.y += currentVerticalSpeed * Time.deltaTime;
+
+        // Clamp height if ground limit is active and no CharacterController
+        if (useGroundLimit && (characterController == null || !characterController.enabled) && (rigTarget.position.y + moveDelta.y) < minGroundY)
+        {
+            float clampDeltaY = minGroundY - rigTarget.position.y;
+            if (moveDelta.y < clampDeltaY)
+            {
+                moveDelta.y = clampDeltaY;
+                currentVerticalSpeed = 0f;
+            }
+        }
+
+        // Log grounded state transitions
+        if (debugLogs && isGrounded != lastGroundedState)
+        {
+            Debug.Log($"[BroomFlight Grounded Toggle] isGrounded: {isGrounded} | RigY: {rigTarget.position.y:F2} | VertSpeed: {currentVerticalSpeed:F2}");
+            lastGroundedState = isGrounded;
+        }
+
+        // Apply movement vector to Rig Target
+        if (moveDelta.sqrMagnitude > 0.000001f)
+        {
+            if (characterController != null && characterController.enabled)
+            {
+                lastCollisionFlags = characterController.Move(moveDelta);
+                if (debugLogs && targetAltitude > 0 && (lastCollisionFlags & CollisionFlags.CollidedAbove) != 0)
+                {
+                    Debug.LogWarning("[BroomFlight Collision] Collided with CEILING above!");
+                }
+            }
+            else if (rb != null && !rb.isKinematic)
+            {
+                rb.MovePosition(rigTarget.position + moveDelta);
+            }
+            else
+            {
+                rigTarget.position += moveDelta;
+            }
+        }
     }
+
 
     void ParseSerialData()
     {
